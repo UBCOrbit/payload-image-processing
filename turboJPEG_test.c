@@ -14,28 +14,35 @@ int main(int argc, char **argv)
 {
     if (argv[1] == NULL)
     {
-        printf("Usage: [program name] [source image] [output image]\n");
+        printf("Usage: ./path/to/program ./path/to/source/data ./path/to/output/jpeg\n");
         return 0;
     }
+
     int err;
-    const int JPEG_QUALITY = 75;
+
+    // Image parameters
+    int JPEG_QUALITY = 25;
     const int COLOR_COMPONENTS = 3;
-    int _width = 1280;
-    int _height = 960;
-    long unsigned int _jpegSize = 0;
+    int width = 1280;
+    int height = 960;
+    long unsigned int jpeg_size = 0;
+    int pass = 1;
     
+    // File buffers
     unsigned char* buffer;
     unsigned char* out_buffer = NULL;
 
-    FILE *in_file = fopen(argv[1], "r"); // Uncompressed image data
-    FILE *out_file = fopen(argv[2], "w+");
+    // Open the raw data file for reading.
+    FILE *in_file = fopen(argv[1], "r");
 
+    // Determine the size of the file.
     fseek(in_file, 0L, SEEK_END);
     size_t sz = ftell(in_file);
     fseek(in_file, 0L, SEEK_SET);
     
     buffer = malloc(sz);
 
+    // Read in the raw data into the buffer.
     for (int i = 0; i < sz; i++)
     {
         buffer[i] = (char) fgetc(in_file);
@@ -46,18 +53,30 @@ int main(int argc, char **argv)
 
     printf("Read in file of size: %d kb.\n", (int) sz / 1000);
 
-    tjhandle _jpegCompressor = tjInitCompress();
+    tjhandle jpeg_compressor = tjInitCompress();
 
-    tjCompress2(_jpegCompressor, buffer, _width, 0, _height, TJPF_RGB,
-                &out_buffer, &_jpegSize, TJSAMP_444, JPEG_QUALITY,
-                TJFLAG_FASTDCT);
+    printf("Compressing...\nSize    Pass\n");
+    do
+    {
+        tjCompress2(jpeg_compressor, buffer, width, 0, height, TJPF_RGB,
+                    &out_buffer, &jpeg_size, TJSAMP_444, JPEG_QUALITY,
+                    TJFLAG_FASTDCT);
+        
+        printf("%4lukb   %4d\n", jpeg_size/1000, pass);
+        pass++;
+        JPEG_QUALITY -= 1;
+    }
+    while (JPEG_QUALITY > 0 && jpeg_size > 100000);
 
-    printf("Compressed image to size: %d kb.\n", (int) _jpegSize / 1000);
+    printf("Final image size: %d kb.\n", (int) jpeg_size / 1000);
 
-    tjDestroy(_jpegCompressor);
+    tjDestroy(jpeg_compressor);
+
+    // Open or create the output jpeg for writing.
+    FILE *out_file = fopen(argv[2], "w+");
 
     // Write the compressed image data to the output file.
-    for (int i = 0; i < _jpegSize; i++)
+    for (int i = 0; i < jpeg_size; i++)
     {
 
         fputc((int) out_buffer[i], out_file);
