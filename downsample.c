@@ -2,10 +2,6 @@
 /*
  * This function will use the passed pixel buffer and downsample it
  * into the downsample buffer.
- * 
- * Algorithm:
- * - Calculate how much to crop off each row and how many rows to remove
- * - - This will be based on the ratio of the input image
  */
 
 #define IN_WIDTH 5664
@@ -43,8 +39,6 @@ int downsample(unsigned char *pixel_buffer, unsigned char *ds_buffer)
             cropped_image[i][j] = pixel_buffer[j + (i * IN_WIDTH * 3)];
         }
     }
-
-    printf("Allocated space for cropped image.\n");
 
     // Free the 2D array
     for (int i = 0; i < cropped_height; i++)
