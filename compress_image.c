@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <turbojpeg.h>
 #include <string.h>
+#include "./downsample.c"
 
 #define MAX_IMG_SIZE 100*1024
 #define COLOR_COMPONENTS 3
@@ -49,6 +50,8 @@ int main(int argc, char **argv)
         printf("Error reading raw data.\n");
         return -1;
     }
+
+    downsample(buffer, NULL);
 
     // Don't need source data anymore.
     fclose(in_file);
