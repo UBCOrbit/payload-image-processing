@@ -10,6 +10,8 @@
 #include "./downsample.c"
 
 #define MAX_IMG_SIZE 100*1024
+#define IMAGE_WIDTH 5664
+#define IMAGE_HEIGHT 4248
 #define COLOR_COMPONENTS 3
 
 int main(int argc, char **argv)
@@ -25,8 +27,6 @@ int main(int argc, char **argv)
 
     // Image parameters
     int jpeg_quality = 25;
-    int width = 1280;
-    int height = 960;
     long unsigned int jpeg_size = 0;
     int pass = 1;
 
@@ -50,20 +50,20 @@ int main(int argc, char **argv)
         printf("Error reading raw data.\n");
         return -1;
     }
+    
+    printf("Read in file of size: %d kb.\n", (int) sz / 1024);
 
     downsample(buffer, NULL);
 
     // Don't need source data anymore.
     fclose(in_file);
 
-    printf("Read in file of size: %d kb.\n", (int) sz / 1024);
-
     tjhandle jpeg_compressor = tjInitCompress();
 
     printf("Compressing...\nSize    Pass\n");
     do
     {
-        tjCompress2(jpeg_compressor, buffer, width, 0, height, TJPF_RGB,
+        tjCompress2(jpeg_compressor, buffer, IMAGE_WIDTH, 0, IMAGE_HEIGHT, TJPF_RGB,
                     &out_buffer, &jpeg_size, TJSAMP_444, jpeg_quality,
                     TJFLAG_FASTDCT);
 
