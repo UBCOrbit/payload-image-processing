@@ -33,7 +33,7 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
     double width_factor = ((double) source_width) / dest_width;
     double height_factor = ((double) source_height) / dest_height;
 
-    double sq_factor = width_factor * height_factor;
+    double sq_factor = 1 / (width_factor * height_factor);
 
     for (uint32_t y = 0; y < dest_height; ++y) {
         double lower_y = height_factor * y;
@@ -64,11 +64,101 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
                 }
             }
 
-            dest[y][x][0] = avg_r / sq_factor;
-            dest[y][x][1] = avg_g / sq_factor;
-            dest[y][x][2] = avg_b / sq_factor;
+            dest[y][x][0] = avg_r * sq_factor;
+            dest[y][x][1] = avg_g * sq_factor;
+            dest[y][x][2] = avg_b * sq_factor;
         }
     }
+}
+
+// Testing new algorithm that might be faster at the cost of more memory
+void downscale2(const uint8_t *source_buf, size_t source_width, size_t source_height,
+               uint8_t *dest_buf, size_t dest_width, size_t dest_height)
+{
+    const uint8_t (*source)[source_width][3] = (void*) source_buf;
+    double (*dest)[dest_width][3] = malloc(dest_width * dest_height * 3 * sizeof(double));
+
+    // Note, these are the inverse of the previous algorithm, should always be < 1
+    double width_factor = ((double) dest_width) / source_width;
+    double height_factor = ((double) dest_height) / source_height;
+
+    double sq_factor = width_factor * height_factor;
+
+    for (uint32_t sy = 0; sy < source_height; ++sy) {
+        uint32_t y_min = floor(sy * height_factor);
+        uint32_t y_max = floor((sy + 1) * height_factor);
+        if (y_min == y_max) {
+            // Pixel y lies entirely within one pixel of output
+            for (uint32_t sx = 0; sx < source_width; ++sx) {
+                uint32_t x_min = floor(sx * width_factor);
+                uint32_t x_max = floor((sx + 1) * width_factor);
+                if (x_min == x_max) {
+                    // Pixel x lies entirely within one pixel of output
+                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor;
+                } else {
+                    // Pixel x straddles two pixels
+                    double min_x_area = x_max / width_factor - sx;
+                    double max_x_area = 1 - min_x_area;
+
+                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_x_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_x_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_x_area;
+
+                    dest[y_min][x_max][0] += source[sy][sx][0] * sq_factor * max_x_area;
+                    dest[y_min][x_max][1] += source[sy][sx][1] * sq_factor * max_x_area;
+                    dest[y_min][x_max][2] += source[sy][sx][2] * sq_factor * max_x_area;
+                }
+            }
+        } else {
+            // Pixel y straddles two pixels
+            double min_y_area = y_max / height_factor - sy;
+            double max_y_area = 1 / min_y_area;
+
+            for (uint32_t sx = 0; sx < source_width; ++sx) {
+                uint32_t x_min = floor(sx * width_factor);
+                uint32_t x_max = floor((sx + 1) * width_factor);
+                if (x_min == x_max) {
+                    // Pixel x lies entirely within one pixel of output
+                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_y_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_y_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_y_area;
+
+                    dest[y_max][x_min][0] += source[sy][sx][0] * sq_factor * max_y_area;
+                    dest[y_max][x_min][1] += source[sy][sx][1] * sq_factor * max_y_area;
+                    dest[y_max][x_min][2] += source[sy][sx][2] * sq_factor * max_y_area;
+                } else {
+                    // Pixel x straddles two pixels
+                    double min_x_area = x_max / width_factor - sx;
+                    double max_x_area = 1 - min_x_area;
+
+                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_y_area * min_x_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_y_area * min_x_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_y_area * min_x_area;
+
+                    dest[y_max][x_min][0] += source[sy][sx][0] * sq_factor * max_y_area * min_x_area;
+                    dest[y_max][x_min][1] += source[sy][sx][1] * sq_factor * max_y_area * min_x_area;
+                    dest[y_max][x_min][2] += source[sy][sx][2] * sq_factor * max_y_area * min_x_area;
+
+                    dest[y_min][x_max][0] += source[sy][sx][0] * sq_factor * min_y_area * max_x_area;
+                    dest[y_min][x_max][1] += source[sy][sx][1] * sq_factor * min_y_area * max_x_area;
+                    dest[y_min][x_max][2] += source[sy][sx][2] * sq_factor * min_y_area * max_x_area;
+
+                    dest[y_max][x_max][0] += source[sy][sx][0] * sq_factor * max_y_area * max_x_area;
+                    dest[y_max][x_max][1] += source[sy][sx][1] * sq_factor * max_y_area * max_x_area;
+                    dest[y_max][x_max][2] += source[sy][sx][2] * sq_factor * max_y_area * max_x_area;
+                }
+            }
+        }
+    }
+
+    double *dest_arr = (void*) dest;
+    for (size_t i = 0; i < 3 * dest_width * dest_height; ++i) {
+        dest_buf[i] = dest_arr[i];
+    }
+
+    free(dest);
 }
 
 size_t compress(const uint8_t *buffer, size_t width, size_t height, uint8_t **out_buffer)
