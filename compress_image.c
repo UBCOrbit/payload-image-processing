@@ -41,23 +41,23 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
     for (uint32_t y = 0; y < dest_height; ++y) {
         double lower_y = height_factor * y;
         double upper_y = lower_y + height_factor;
-        uint32_t start_y = lower_y; // Note these are the floor values
-        uint32_t end_y = upper_y;
+        uint32_t start_y = floor(lower_y);
+        uint32_t end_y = ceil(upper_y);
 
         for (uint32_t x = 0; x < dest_width; ++x) {
             double lower_x = width_factor * x;
             double upper_x = lower_x + width_factor;
-            uint32_t start_x = lower_x; // These are floor values
-            uint32_t end_x = upper_x;
+            uint32_t start_x = floor(lower_x);
+            uint32_t end_x = ceil(upper_x);
 
             double avg_r = 0;
             double avg_g = 0;
             double avg_b = 0;
 
-            for (uint32_t sy = start_y; sy <= end_y; ++sy) {
+            for (uint32_t sy = start_y; sy < end_y; ++sy) {
                 double len_y = fmin(sy + 1, upper_y) - fmax(sy, lower_y);
 
-                for (uint32_t sx = start_x; sx <= end_x; ++sx) {
+                for (uint32_t sx = start_x; sx < end_x; ++sx) {
                     double len_x = fmin(sx + 1, upper_x) - fmax(sx, lower_x);
                     double area = len_x * len_y;
                     // average plus equals the color times pixel area
@@ -67,9 +67,9 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
                 }
             }
 
-            dest[y][x][0] = avg_r * sq_factor + DBL_MIN;
-            dest[y][x][1] = avg_g * sq_factor + DBL_MIN;
-            dest[y][x][2] = avg_b * sq_factor + DBL_MIN;
+            dest[y][x][0] = avg_r * sq_factor + 0.5;
+            dest[y][x][1] = avg_g * sq_factor + 0.5;
+            dest[y][x][2] = avg_b * sq_factor + 0.5;
         }
     }
 }
@@ -79,7 +79,7 @@ void downscale2(const uint8_t *source_buf, size_t source_width, size_t source_he
                uint8_t *dest_buf, size_t dest_width, size_t dest_height)
 {
     const uint8_t (*source)[source_width][3] = (void*) source_buf;
-    double (*dest)[dest_width][3] = malloc(dest_width * dest_height * 3 * sizeof(double));
+    double (*dest)[dest_width][3] = calloc(dest_width * dest_height * 3, sizeof(double));
 
     // Note, these are the inverse of the previous algorithm, should always be < 1
     double width_factor = ((double) dest_width) / source_width;
@@ -158,7 +158,7 @@ void downscale2(const uint8_t *source_buf, size_t source_width, size_t source_he
 
     double *dest_arr = (void*) dest;
     for (size_t i = 0; i < 3 * dest_width * dest_height; ++i) {
-        dest_buf[i] = dest_arr[i] * sq_factor + DBL_MIN;
+        dest_buf[i] = dest_arr[i] * sq_factor + 0.5;
     }
 
     free(dest);
@@ -168,7 +168,7 @@ void downscale3(const uint8_t *source_buf, size_t source_width, size_t source_he
                uint8_t *dest_buf, size_t dest_width, size_t dest_height)
 {
     const uint8_t (*source)[source_width][3] = (void*) source_buf;
-    double (*dest)[dest_width][3] = malloc(dest_width * dest_height * 3 * sizeof(double));
+    double (*dest)[dest_width][3] = calloc(dest_width * dest_height * 3, sizeof(double));
 
     // Note, these are the inverse of the previous algorithm, should always be < 1
     double width_factor = ((double) dest_width) / source_width;
@@ -254,7 +254,7 @@ void downscale3(const uint8_t *source_buf, size_t source_width, size_t source_he
 
     double *dest_arr = (void*) dest;
     for (size_t i = 0; i < 3 * dest_width * dest_height; ++i) {
-        dest_buf[i] = dest_arr[i] * sq_factor + DBL_MIN;
+        dest_buf[i] = dest_arr[i] * sq_factor + 0.5;
     }
 
     free(dest);
@@ -339,8 +339,8 @@ int main(int argc, char **argv)
     /*
     uint8_t *ds2_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
 
-    downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
-    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds2_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale3(buffer, IN_WIDTH, IN_HEIGHT, ds2_buffer, OUT_WIDTH, OUT_HEIGHT);
 
     for (size_t i = 0; i < OUT_WIDTH * OUT_HEIGHT * 3; ++i) {
         if (ds_buffer[i] != ds2_buffer[i]) {
@@ -349,6 +349,7 @@ int main(int argc, char **argv)
                    ds_buffer[i], ds2_buffer[i]);
         }
     }
+    free(ds2_buffer);
     */
 
     /*
@@ -383,7 +384,7 @@ int main(int argc, char **argv)
     printf("Downscale3: %f\n", stop_time - start_time);
     */
 
-    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
     size_t jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
