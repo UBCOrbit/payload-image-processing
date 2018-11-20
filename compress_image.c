@@ -262,11 +262,11 @@ void downscale3(const uint8_t *source_buf, size_t source_width, size_t source_he
     free(x_widths_min);
 }
 
-size_t compress(const uint8_t *buffer, size_t width, size_t height, uint8_t **out_buffer)
+unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8_t **out_buffer)
 {
     // Image parameters
     int jpeg_quality = 25;
-    size_t jpeg_size = 0;
+    unsigned long jpeg_size = 0;
     int pass = 1;
 
     tjhandle jpeg_compressor = tjInitCompress();
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
 
     downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
-    size_t jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
+    unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
     // Open or create the output jpeg for writing.
     FILE *out_file = fopen(argv[2], "w");
