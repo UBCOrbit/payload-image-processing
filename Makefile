@@ -1,4 +1,4 @@
-CFLAGS += -lturbojpeg -lm
+CFLAGS += -lturbojpeg -lm -g
 
 all: compress_image
 

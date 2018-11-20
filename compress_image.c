@@ -3,11 +3,14 @@
  * under a specified limit.
  */
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
 #include <turbojpeg.h>
 
 #define MAX_IMG_SIZE 100000
@@ -33,19 +36,19 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
     double width_factor = ((double) source_width) / dest_width;
     double height_factor = ((double) source_height) / dest_height;
 
-    double sq_factor = 1 / (width_factor * height_factor);
+    double sq_factor = 1.0 / (width_factor * height_factor);
 
     for (uint32_t y = 0; y < dest_height; ++y) {
         double lower_y = height_factor * y;
         double upper_y = lower_y + height_factor;
-        uint32_t start_y = floor(lower_y);
-        uint32_t end_y = ceil(upper_y);
+        uint32_t start_y = lower_y; // Note these are the floor values
+        uint32_t end_y = upper_y;
 
         for (uint32_t x = 0; x < dest_width; ++x) {
             double lower_x = width_factor * x;
             double upper_x = lower_x + width_factor;
-            uint32_t start_x = floor(lower_x);
-            uint32_t end_x = ceil(upper_x);
+            uint32_t start_x = lower_x; // These are floor values
+            uint32_t end_x = upper_x;
 
             double avg_r = 0;
             double avg_g = 0;
@@ -64,9 +67,9 @@ void downscale(const uint8_t *source_buf, size_t source_width, size_t source_hei
                 }
             }
 
-            dest[y][x][0] = avg_r * sq_factor;
-            dest[y][x][1] = avg_g * sq_factor;
-            dest[y][x][2] = avg_b * sq_factor;
+            dest[y][x][0] = avg_r * sq_factor + DBL_MIN;
+            dest[y][x][1] = avg_g * sq_factor + DBL_MIN;
+            dest[y][x][2] = avg_b * sq_factor + DBL_MIN;
         }
     }
 }
@@ -85,69 +88,69 @@ void downscale2(const uint8_t *source_buf, size_t source_width, size_t source_he
     double sq_factor = width_factor * height_factor;
 
     for (uint32_t sy = 0; sy < source_height; ++sy) {
-        uint32_t y_min = floor(sy * height_factor);
-        uint32_t y_max = floor((sy + 1) * height_factor);
-        if (y_min == y_max) {
+        uint32_t y_min = sy * height_factor; // floor by default
+        uint32_t y_max = (sy + 1) * height_factor;
+        if (y_min == y_max || y_max == dest_height) {
             // Pixel y lies entirely within one pixel of output
             for (uint32_t sx = 0; sx < source_width; ++sx) {
-                uint32_t x_min = floor(sx * width_factor);
-                uint32_t x_max = floor((sx + 1) * width_factor);
-                if (x_min == x_max) {
+                uint32_t x_min = sx * width_factor; // floor by default
+                uint32_t x_max = (sx + 1) * width_factor;
+                if (x_min == x_max || x_max == dest_width) {
                     // Pixel x lies entirely within one pixel of output
-                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor;
-                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor;
-                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor;
+                    dest[y_min][x_min][0] += source[sy][sx][0];
+                    dest[y_min][x_min][1] += source[sy][sx][1];
+                    dest[y_min][x_min][2] += source[sy][sx][2];
                 } else {
                     // Pixel x straddles two pixels
                     double min_x_area = x_max / width_factor - sx;
                     double max_x_area = 1 - min_x_area;
 
-                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_x_area;
-                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_x_area;
-                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_x_area;
+                    dest[y_min][x_min][0] += source[sy][sx][0] * min_x_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * min_x_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * min_x_area;
 
-                    dest[y_min][x_max][0] += source[sy][sx][0] * sq_factor * max_x_area;
-                    dest[y_min][x_max][1] += source[sy][sx][1] * sq_factor * max_x_area;
-                    dest[y_min][x_max][2] += source[sy][sx][2] * sq_factor * max_x_area;
+                    dest[y_min][x_max][0] += source[sy][sx][0] * max_x_area;
+                    dest[y_min][x_max][1] += source[sy][sx][1] * max_x_area;
+                    dest[y_min][x_max][2] += source[sy][sx][2] * max_x_area;
                 }
             }
         } else {
             // Pixel y straddles two pixels
             double min_y_area = y_max / height_factor - sy;
-            double max_y_area = 1 / min_y_area;
+            double max_y_area = 1 - min_y_area;
 
             for (uint32_t sx = 0; sx < source_width; ++sx) {
-                uint32_t x_min = floor(sx * width_factor);
-                uint32_t x_max = floor((sx + 1) * width_factor);
-                if (x_min == x_max) {
+                uint32_t x_min = sx * width_factor; // floor by default
+                uint32_t x_max = (sx + 1) * width_factor;
+                if (x_min == x_max || x_max == dest_width) {
                     // Pixel x lies entirely within one pixel of output
-                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_y_area;
-                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_y_area;
-                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_y_area;
+                    dest[y_min][x_min][0] += source[sy][sx][0] * min_y_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * min_y_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * min_y_area;
 
-                    dest[y_max][x_min][0] += source[sy][sx][0] * sq_factor * max_y_area;
-                    dest[y_max][x_min][1] += source[sy][sx][1] * sq_factor * max_y_area;
-                    dest[y_max][x_min][2] += source[sy][sx][2] * sq_factor * max_y_area;
+                    dest[y_max][x_min][0] += source[sy][sx][0] * max_y_area;
+                    dest[y_max][x_min][1] += source[sy][sx][1] * max_y_area;
+                    dest[y_max][x_min][2] += source[sy][sx][2] * max_y_area;
                 } else {
                     // Pixel x straddles two pixels
                     double min_x_area = x_max / width_factor - sx;
                     double max_x_area = 1 - min_x_area;
 
-                    dest[y_min][x_min][0] += source[sy][sx][0] * sq_factor * min_y_area * min_x_area;
-                    dest[y_min][x_min][1] += source[sy][sx][1] * sq_factor * min_y_area * min_x_area;
-                    dest[y_min][x_min][2] += source[sy][sx][2] * sq_factor * min_y_area * min_x_area;
+                    dest[y_min][x_min][0] += source[sy][sx][0] * min_y_area * min_x_area;
+                    dest[y_min][x_min][1] += source[sy][sx][1] * min_y_area * min_x_area;
+                    dest[y_min][x_min][2] += source[sy][sx][2] * min_y_area * min_x_area;
 
-                    dest[y_max][x_min][0] += source[sy][sx][0] * sq_factor * max_y_area * min_x_area;
-                    dest[y_max][x_min][1] += source[sy][sx][1] * sq_factor * max_y_area * min_x_area;
-                    dest[y_max][x_min][2] += source[sy][sx][2] * sq_factor * max_y_area * min_x_area;
+                    dest[y_max][x_min][0] += source[sy][sx][0] * max_y_area * min_x_area;
+                    dest[y_max][x_min][1] += source[sy][sx][1] * max_y_area * min_x_area;
+                    dest[y_max][x_min][2] += source[sy][sx][2] * max_y_area * min_x_area;
 
-                    dest[y_min][x_max][0] += source[sy][sx][0] * sq_factor * min_y_area * max_x_area;
-                    dest[y_min][x_max][1] += source[sy][sx][1] * sq_factor * min_y_area * max_x_area;
-                    dest[y_min][x_max][2] += source[sy][sx][2] * sq_factor * min_y_area * max_x_area;
+                    dest[y_min][x_max][0] += source[sy][sx][0] * min_y_area * max_x_area;
+                    dest[y_min][x_max][1] += source[sy][sx][1] * min_y_area * max_x_area;
+                    dest[y_min][x_max][2] += source[sy][sx][2] * min_y_area * max_x_area;
 
-                    dest[y_max][x_max][0] += source[sy][sx][0] * sq_factor * max_y_area * max_x_area;
-                    dest[y_max][x_max][1] += source[sy][sx][1] * sq_factor * max_y_area * max_x_area;
-                    dest[y_max][x_max][2] += source[sy][sx][2] * sq_factor * max_y_area * max_x_area;
+                    dest[y_max][x_max][0] += source[sy][sx][0] * max_y_area * max_x_area;
+                    dest[y_max][x_max][1] += source[sy][sx][1] * max_y_area * max_x_area;
+                    dest[y_max][x_max][2] += source[sy][sx][2] * max_y_area * max_x_area;
                 }
             }
         }
@@ -155,7 +158,7 @@ void downscale2(const uint8_t *source_buf, size_t source_width, size_t source_he
 
     double *dest_arr = (void*) dest;
     for (size_t i = 0; i < 3 * dest_width * dest_height; ++i) {
-        dest_buf[i] = dest_arr[i];
+        dest_buf[i] = dest_arr[i] * sq_factor + DBL_MIN;
     }
 
     free(dest);
@@ -234,7 +237,42 @@ int main(int argc, char **argv)
     fclose(in_file);
 
     ds_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
+
+    /*
+    uint8_t *ds2_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
+
     downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds2_buffer, OUT_WIDTH, OUT_HEIGHT);
+
+    for (size_t i = 0; i < OUT_WIDTH * OUT_HEIGHT * 3; ++i) {
+        if (ds_buffer[i] != ds2_buffer[i]) {
+            printf("differing pixel at: %lu, (%lu, %lu, %lu), %d, %d\n",
+                   i, i / (OUT_WIDTH * 3), (i % OUT_WIDTH) / 3, i % 3,
+                   ds_buffer[i], ds2_buffer[i]);
+        }
+    }
+    */
+
+    /*
+    struct timespec t1, t2, t3;
+
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
+    // for (int i = 0; i < 100; ++i)
+    //     downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
+    for (int i = 0; i < 100; ++i)
+        downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t3);
+
+    double start_time = t1.tv_sec + t1.tv_nsec / 1000000000.0;
+    double ds_time = t2.tv_sec + t2.tv_nsec / 1000000000.0;
+    double ds2_time = t3.tv_sec + t3.tv_nsec / 1000000000.0;
+    printf("Downscale: %f\nDownscale2: %f\n", ds_time - start_time, ds2_time - ds_time);
+    */
+
+    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
     size_t jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
