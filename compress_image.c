@@ -265,13 +265,16 @@ void downscale3(const uint8_t *source_buf, size_t source_width, size_t source_he
 unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8_t **out_buffer)
 {
     // Image parameters
-    int jpeg_quality = 25;
+    int jpeg_quality = 30;
     unsigned long jpeg_size = 0;
     int pass = 1;
 
     tjhandle jpeg_compressor = tjInitCompress();
 
     printf("Compressing...\nSize    Pass\n");
+
+    uint8_t done = 0;
+    int8_t dir = 0; // up will be 1, down will be -1
 
     do {
         tjCompress2(jpeg_compressor, buffer, width, 0, height, TJPF_RGB,
@@ -280,8 +283,22 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
 
         printf("%4lukb   %4d\n", jpeg_size / 1024, pass);
         pass++;
-        jpeg_quality--;
-    } while (jpeg_quality > 0 && jpeg_size > MAX_IMG_SIZE);
+
+        if (jpeg_quality > 0 && jpeg_size > MAX_IMG_SIZE)
+        {
+            if (dir == 1)
+                done = 1;
+            jpeg_quality--;
+            dir = -1;
+        }
+        else if (jpeg_quality > 0 && jpeg_size < MAX_IMG_SIZE)
+        {
+            if (dir == -1)
+                done = 1;
+            jpeg_quality++;
+            dir = 1;
+        }
+    } while (!done);
 
     printf("Final image size: %d kb.\n", (int) jpeg_size / 1024);
 
@@ -292,9 +309,9 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 5)
     {
-        printf("Usage: %s ./path/to/source/data ./path/to/output/jpeg\n",
+        printf("Usage: %s ./path/to/source/data source_width source_height ./path/to/output/jpeg\n",
                argv[0]);
         return 0;
     }
@@ -306,6 +323,16 @@ int main(int argc, char **argv)
     uint8_t *ds_buffer;
     uint8_t *out_buffer = NULL;
 
+    char *e;
+    uint16_t in_width = (uint16_t) strtol(argv[2], &e, 10);
+    uint16_t in_height = (uint16_t) strtol(argv[3], &e, 10);
+
+    if (*e != '\0')
+    {
+        printf("Error: please check your resolution parameters.\n");
+        return -1;
+    }
+
     // Open the raw data file for reading.
     FILE *in_file = fopen(argv[1], "r");
 
@@ -315,7 +342,7 @@ int main(int argc, char **argv)
     size_t sz = ftell(in_file);
     fseek(in_file, 0L, SEEK_SET);
 
-    if (sz != IN_WIDTH * IN_HEIGHT * 3) {
+    if (sz != in_width * in_height * 3) {
         printf("Invalid file size.\n");
         return -1;
     }
@@ -336,60 +363,14 @@ int main(int argc, char **argv)
 
     ds_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
 
-    /*
-    uint8_t *ds2_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
 
-    downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
-    downscale3(buffer, IN_WIDTH, IN_HEIGHT, ds2_buffer, OUT_WIDTH, OUT_HEIGHT);
 
-    for (size_t i = 0; i < OUT_WIDTH * OUT_HEIGHT * 3; ++i) {
-        if (ds_buffer[i] != ds2_buffer[i]) {
-            printf("differing pixel at: %lu, (%lu, %lu, %lu), %d, %d\n",
-                   i, i / (OUT_WIDTH * 3), (i % OUT_WIDTH) / 3, i % 3,
-                   ds_buffer[i], ds2_buffer[i]);
-        }
-    }
-    free(ds2_buffer);
-    */
-
-    /*
-    struct timespec t1, t2;
-    double start_time, stop_time;
-
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
-    for (int i = 0; i < 100; ++i)
-        downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
-
-    start_time = t1.tv_sec + t1.tv_nsec / 1000000000.0;
-    stop_time = t2.tv_sec + t2.tv_nsec / 1000000000.0;
-    printf("Downscale: %f\n", stop_time - start_time);
-
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
-    for (int i = 0; i < 100; ++i)
-        downscale2(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
-
-    start_time = t1.tv_sec + t1.tv_nsec / 1000000000.0;
-    stop_time = t2.tv_sec + t2.tv_nsec / 1000000000.0;
-    printf("Downscale2: %f\n", stop_time - start_time);
-
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
-    for (int i = 0; i < 100; ++i)
-        downscale3(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
-
-    start_time = t1.tv_sec + t1.tv_nsec / 1000000000.0;
-    stop_time = t2.tv_sec + t2.tv_nsec / 1000000000.0;
-    printf("Downscale3: %f\n", stop_time - start_time);
-    */
-
-    downscale(buffer, IN_WIDTH, IN_HEIGHT, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
     unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
     // Open or create the output jpeg for writing.
-    FILE *out_file = fopen(argv[2], "w");
+    FILE *out_file = fopen(argv[4], "w");
 
     // Write the compressed image data to the output file.
     err = fwrite(out_buffer, 1, jpeg_size, out_file);
