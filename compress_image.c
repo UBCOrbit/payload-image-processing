@@ -1,7 +1,6 @@
-/*
- * Loads raw pixel data, converts it to a JPEG image, and compresses it to
- * under a specified limit.
- */
+
+// Loads raw pixel data, converts it to a JPEG image, and compresses it to
+// under a specified limit.
 
 #include <float.h>
 #include <math.h>
@@ -10,15 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
 #include <turbojpeg.h>
+#include "compress_image.h"
 
 #define MAX_IMG_SIZE 100000
-
-// #define IN_WIDTH 5664
-// #define IN_HEIGHT 4248
-#define IN_WIDTH 5505
-#define IN_HEIGHT 3670
 
 #define OUT_WIDTH 1280
 #define OUT_HEIGHT 853
@@ -384,87 +378,87 @@ int compress_image(char *src_data, uint16_t in_width, uint16_t in_height, char *
 }
 
 
-int main(int argc, char **argv)
-{
-    if (argc != 5)
-    {
-        printf("Usage: %s ./path/to/source/data source_width source_height ./path/to/output/jpeg\n",
-               argv[0]);
-        return 0;
-    }
+// int main(int argc, char **argv)
+// {
+//     if (argc != 5)
+//     {
+//         printf("Usage: %s ./path/to/source/data source_width source_height ./path/to/output/jpeg\n",
+//                argv[0]);
+//         return 0;
+//     }
 
-    size_t err;
+//     size_t err;
 
-    // File buffers
-    uint8_t *buffer;
-    uint8_t *ds_buffer;
-    uint8_t *out_buffer = NULL;
+//     // File buffers
+//     uint8_t *buffer;
+//     uint8_t *ds_buffer;
+//     uint8_t *out_buffer = NULL;
 
-    char *e;
-    uint16_t in_width = (uint16_t) strtol(argv[2], &e, 10);
-    uint16_t in_height = (uint16_t) strtol(argv[3], &e, 10);
+//     char *e;
+//     uint16_t in_width = (uint16_t) strtol(argv[2], &e, 10);
+//     uint16_t in_height = (uint16_t) strtol(argv[3], &e, 10);
 
-    if (*e != '\0')
-    {
-        printf("Error: please check your resolution parameters.\n");
-        return -1;
-    }
+//     if (*e != '\0')
+//     {
+//         printf("Error: please check your resolution parameters.\n");
+//         return -1;
+//     }
 
-    // Open the raw data file for reading.
-    FILE *in_file = fopen(argv[1], "r");
+//     // Open the raw data file for reading.
+//     FILE *in_file = fopen(argv[1], "r");
 
-    // Determine the size of the file.
-    // Later this will be a constant size for our images
-    fseek(in_file, 0L, SEEK_END);
-    size_t sz = ftell(in_file);
-    fseek(in_file, 0L, SEEK_SET);
+//     // Determine the size of the file.
+//     // Later this will be a constant size for our images
+//     fseek(in_file, 0L, SEEK_END);
+//     size_t sz = ftell(in_file);
+//     fseek(in_file, 0L, SEEK_SET);
 
-    if (sz != in_width * in_height * 3) {
-        printf("Invalid file size.\n");
-        return -1;
-    }
+//     if (sz != in_width * in_height * 3) {
+//         printf("Invalid file size.\n");
+//         return -1;
+//     }
 
-    buffer = malloc(sz);
+//     buffer = malloc(sz);
 
-    // Read in the raw data into the buffer.
-    err = fread(buffer, 1, sz, in_file);
-    if (err != sz) {
-        printf("Error reading raw data.\n");
-        return -1;
-    }
+//     // Read in the raw data into the buffer.
+//     err = fread(buffer, 1, sz, in_file);
+//     if (err != sz) {
+//         printf("Error reading raw data.\n");
+//         return -1;
+//     }
 
-    printf("Read in file of size: %d kb.\n", (int) sz / 1024);
+//     printf("Read in file of size: %d kb.\n", (int) sz / 1024);
 
-    // Don't need source data anymore.
-    fclose(in_file);
+//     // Don't need source data anymore.
+//     fclose(in_file);
 
-    ds_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
+//     ds_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
 
 
 
-    downscale2(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+//     downscale2(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
-    unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
+//     unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
-    // Open or create the output jpeg for writing.
-    FILE *out_file = fopen(argv[4], "w");
+//     // Open or create the output jpeg for writing.
+//     FILE *out_file = fopen(argv[4], "w");
 
-    // Write the compressed image data to the output file.
-    err = fwrite(out_buffer, 1, jpeg_size, out_file);
-    if (err != jpeg_size) {
-        printf("Error writing compressed image.\n");
-        return -1;
-    }
+//     // Write the compressed image data to the output file.
+//     err = fwrite(out_buffer, 1, jpeg_size, out_file);
+//     if (err != jpeg_size) {
+//         printf("Error writing compressed image.\n");
+//         return -1;
+//     }
 
-    // Done writing to file.
-    fclose(out_file);
+//     // Done writing to file.
+//     fclose(out_file);
 
-    //to free the memory allocated by TurboJPEG (either by tjAlloc(),
-    //or by the Compress/Decompress) after you are done working on it:
-    tjFree(out_buffer);
+//     //to free the memory allocated by TurboJPEG (either by tjAlloc(),
+//     //or by the Compress/Decompress) after you are done working on it:
+//     tjFree(out_buffer);
 
-    free(buffer);
-    free(ds_buffer);
+//     free(buffer);
+//     free(ds_buffer);
 
-    return 0;
-}
+//     return 0;
+// }
