@@ -309,6 +309,81 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
     return jpeg_size;
 }
 
+int compress_image(char *src_data, uint16_t in_width, uint16_t in_height, char *dst_img)
+{
+    if (src_data == NULL || dst_img == NULL)
+    {
+        printf("Invalid parameters.\n");
+        return 1;
+    }
+
+    size_t err;
+
+    // File buffers
+    uint8_t *buffer;
+    uint8_t *ds_buffer;
+    uint8_t *out_buffer = NULL;
+
+    // Open the raw data file for reading.
+    FILE *in_file = fopen(src_data, "r");
+
+    // Determine the size of the file.
+    // Later this will be a constant size for our images
+    fseek(in_file, 0L, SEEK_END);
+    size_t sz = ftell(in_file);
+    fseek(in_file, 0L, SEEK_SET);
+
+    if (sz != in_width * in_height * 3) {
+        printf("Invalid file size.\n");
+        return -1;
+    }
+
+    buffer = malloc(sz);
+
+    // Read in the raw data into the buffer.
+    err = fread(buffer, 1, sz, in_file);
+    if (err != sz) {
+        printf("Error reading raw data.\n");
+        return -1;
+    }
+
+    printf("Read in file of size: %d kb.\n", (int) sz / 1024);
+
+    // Don't need source data anymore.
+    fclose(in_file);
+
+    ds_buffer = malloc(OUT_WIDTH * OUT_HEIGHT * 3);
+
+
+
+    downscale2(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+
+    unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
+
+    // Open or create the output jpeg for writing.
+    FILE *out_file = fopen(dst_img, "w");
+
+    // Write the compressed image data to the output file.
+    err = fwrite(out_buffer, 1, jpeg_size, out_file);
+    if (err != jpeg_size) {
+        printf("Error writing compressed image.\n");
+        return -1;
+    }
+
+    // Done writing to file.
+    fclose(out_file);
+
+    //to free the memory allocated by TurboJPEG (either by tjAlloc(),
+    //or by the Compress/Decompress) after you are done working on it:
+    tjFree(out_buffer);
+
+    free(buffer);
+    free(ds_buffer);
+
+    return 0;
+}
+
+
 int main(int argc, char **argv)
 {
     if (argc != 5)
