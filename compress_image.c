@@ -266,12 +266,12 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
 {
     // Image parameters
     int jpeg_quality = 30;
-    unsigned long jpeg_size = 0;
+    long jpeg_size = 0;
     int pass = 1;
 
     tjhandle jpeg_compressor = tjInitCompress();
 
-    printf("Compressing...\nSize    Pass\n");
+    printf("Compressing...\nSize    Pass    Off    Quality\n");
 
     uint8_t done = 0;
     int8_t dir = 0; // up will be 1, down will be -1
@@ -281,21 +281,23 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
                     out_buffer, &jpeg_size, TJSAMP_420, jpeg_quality,
                     TJFLAG_FASTDCT);
 
-        printf("%4lukb   %4d\n", jpeg_size / 1024, pass);
+        int off = abs((jpeg_size - MAX_IMG_SIZE) / 1024);
+
+        printf("%4lukb  %4d   %4dkb   %d\n", jpeg_size / 1024, pass, off, jpeg_quality);
         pass++;
 
         if (jpeg_quality > 0 && jpeg_size > MAX_IMG_SIZE)
         {
-            if (dir == 1)
+            if (off <= 1)
                 done = 1;
-            jpeg_quality--;
+            jpeg_quality -= (off / pass) > 1 ? off / pass : 1;
             dir = -1;
         }
         else if (jpeg_quality > 0 && jpeg_size < MAX_IMG_SIZE)
         {
-            if (dir == -1)
+            if (off <= 1)
                 done = 1;
-            jpeg_quality++;
+            jpeg_quality += (off / pass) > 1 ? off / pass : 1;
             dir = 1;
         }
     } while (!done);
@@ -365,7 +367,7 @@ int main(int argc, char **argv)
 
 
 
-    downscale(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
+    downscale2(buffer, in_width, in_height, ds_buffer, OUT_WIDTH, OUT_HEIGHT);
 
     unsigned long jpeg_size = compress(ds_buffer, OUT_WIDTH, OUT_HEIGHT, &out_buffer);
 
