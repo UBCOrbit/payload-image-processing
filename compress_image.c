@@ -15,7 +15,7 @@
 #define MAX_IMG_SIZE 100000
 
 #define OUT_WIDTH 1280
-#define OUT_HEIGHT 853
+#define OUT_HEIGHT 960
 
 void downscale(const uint8_t *source_buf, size_t source_width, size_t source_height,
                uint8_t *dest_buf, size_t dest_width, size_t dest_height)
@@ -277,21 +277,23 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
 
         int off = abs((jpeg_size - MAX_IMG_SIZE) / 1024);
 
-        printf("%4lukb  %4d   %4dkb   %d\n", jpeg_size / 1024, pass, off, jpeg_quality);
+        printf("%4lukb  %4d   %4dkb   %4d\n", jpeg_size / 1024, pass, off, jpeg_quality);
         pass++;
 
         if (jpeg_quality > 0 && jpeg_size > MAX_IMG_SIZE)
         {
             if (off <= 1)
                 done = 1;
-            jpeg_quality -= (off / pass) > 1 ? off / pass : 1;
+            jpeg_quality = abs(jpeg_quality - (off / pass) > 1 ? off / pass : 1); // Minimum quality increment of 1
             dir = -1;
         }
         else if (jpeg_quality > 0 && jpeg_size < MAX_IMG_SIZE)
         {
             if (off <= 1)
                 done = 1;
-            jpeg_quality += (off / pass) > 1 ? off / pass : 1;
+            
+            unsigned long next_q = (jpeg_quality + ((off / pass) > 1 ? off / pass : 1)); // Minimum quality increment of 1
+            jpeg_quality = next_q > 100 ? 100 : next_q; // Max quality of 100
             dir = 1;
         }
     } while (!done);
@@ -373,6 +375,8 @@ int compress_image(char *src_data, uint16_t in_width, uint16_t in_height, char *
 
     free(buffer);
     free(ds_buffer);
+
+    printf("Compressed image by %lu%%!\n\n", (sz / jpeg_size) * 100);
 
     return 0;
 }
