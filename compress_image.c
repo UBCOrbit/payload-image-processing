@@ -268,33 +268,42 @@ unsigned long compress(const uint8_t *buffer, size_t width, size_t height, uint8
     printf("Compressing...\nSize    Pass    Off    Quality\n");
 
     uint8_t done = 0;
-    int8_t dir = 0; // up will be 1, down will be -1
 
+    // Compression loop
     do {
+        // Call the library compress with an inital jpeg_quality of 30. 
+        // This starting value was determined to be a good initial quality 
+        // for images with similar properties to the satellites camera.
         tjCompress2(jpeg_compressor, buffer, width, 0, height, TJPF_RGB,
                     out_buffer, &jpeg_size, TJSAMP_420, jpeg_quality,
                     TJFLAG_FASTDCT);
 
+        // How far is the current image from the desired size.
         int off = abs((jpeg_size - MAX_IMG_SIZE) / 1024);
 
         printf("%4lukb  %4d   %4dkb   %4d\n", jpeg_size / 1024, pass, off, jpeg_quality);
-        pass++;
+        pass++; // Increment the number of iterations the algorithm has run.
 
+        // If the current size is greater than the image size we want, we're going to decrement quality.
         if (jpeg_quality > 0 && jpeg_size > MAX_IMG_SIZE)
         {
+            // If we're within 1kb of the desired size, we're done.
             if (off <= 1)
                 done = 1;
-            jpeg_quality = abs(jpeg_quality - (off / pass) > 1 ? off / pass : 1); // Minimum quality increment of 1
-            dir = -1;
+            
+            // Jpeg_quality is itself, minus how off it is from the desired size devided by the pass number.
+            // This insures that the quality is decremented at a smaller amount as the algorithm progresses
+            // which will allow it to "hone in" on the correct value.
+            jpeg_quality = abs(jpeg_quality - ((off / pass) > 1 ? off / pass : 1)); // Minimum quality increment of 1
         }
-        else if (jpeg_quality > 0 && jpeg_size < MAX_IMG_SIZE)
+        else if (jpeg_quality > 0 && jpeg_size < MAX_IMG_SIZE) // Current size is smaller so we need to increment quality.
         {
             if (off <= 1)
                 done = 1;
             
+            // Same as above except in the other direction.
             unsigned long next_q = (jpeg_quality + ((off / pass) > 1 ? off / pass : 1)); // Minimum quality increment of 1
             jpeg_quality = next_q > 100 ? 100 : next_q; // Max quality of 100
-            dir = 1;
         }
     } while (!done);
 
